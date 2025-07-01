@@ -1,0 +1,53 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(self, in_channels, num_heads=8):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.num_heads = num_heads
+        self.head_dim = in_channels // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.query_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.key_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.value_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.out_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+
+    def forward(self, x):
+        batch_size, channels, height, width = x.size()
+
+        # 打印输入张量的形状
+        print(f"Input shape: {x.shape}")
+
+        # 计算查询、键和值
+        query = self.query_conv(x).view(batch_size, self.num_heads, self.head_dim, height * width).transpose(2, 3)  # [B, H, HW, C//H]
+        key = self.key_conv(x).view(batch_size, self.num_heads, self.head_dim, height * width).transpose(2, 3)  # [B, H, HW, C//H]
+        value = self.value_conv(x).view(batch_size, self.num_heads, self.head_dim, height * width).transpose(2, 3)  # [B, H, HW, C//H]
+
+        # 打印中间张量的形状
+        print(f"Query shape: {query.shape}")
+        print(f"Key shape: {key.shape}")
+        print(f"Value shape: {value.shape}")
+
+        # 计算注意力
+        attention = torch.matmul(query, key.transpose(-2, -1)) * self.scale  # [B, H, HW, HW]
+        attention = F.softmax(attention, dim=-1)  # [B, H, HW, HW]
+
+        # 打印注意力张量的形状
+        print(f"Attention shape: {attention.shape}")
+
+        # 进行注意力乘法
+        out = torch.matmul(attention, value)  # [B, H, HW, C//H]
+        out = out.transpose(2, 3).contiguous().view(batch_size, channels, height, width)  # [B, C, H, W]
+
+        # 通过一个卷积层输出
+        out = self.out_conv(out)
+
+        return out + x  # 残差连接
+
+# 测试
+x = torch.randn(1, 64, 128, 128)
+model = MultiHeadSelfAttention(64, num_heads=8)
+output = model(x)
+print(f"Final output shape: {output.shape}")  # 应该输出 [1, 64, 128, 128]

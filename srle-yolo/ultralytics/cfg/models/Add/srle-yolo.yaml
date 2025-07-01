@@ -1,0 +1,69 @@
+# SRLE-YOLO: YOLOv8s with ABTM, TriAugment-HFFN, LWC-C2f
+# Final optimized YAML matching Figure and paper
+nc: 10  # 类别数，根据数据集调整
+
+depth_multiple: 0.33
+width_multiple: 0.50
+
+backbone:
+  [
+    [-1, 1, Conv, [64, 3, 2]],               # 0-P1/2
+    [-1, 1, Conv, [128, 3, 2]],              # 1-P2/4
+    [-1, 3, LWC_C2f, [128,2,3,5,7]],                 # 2
+    [-1, 1, Conv, [256, 3, 2]],              # 3-P3/8
+    [-1, 6, LWC_C2f, [256,3,5,7,9]],                 # 4
+    [-1, 1, ABTM, []],              # 5-P4/16
+    [-1, 6, LWC_C2f, [512,3,7,9,11]],                 # 6
+    [-1, 1, ABTM, []],             # 7-P5/32
+    [-1, 3, LWC_C2f, [1024,3,9,11,13]],                # 8
+    [-1, 1, SPPF, [1024, 5]],                # 9 → P5
+  ]
+
+neck:
+  [
+    # === I-Level 3D-GLFF Fusion ===
+    [[1, 2, 4], 1, GLFF, []],             # 10: P2' = 3DGLFF(P1,P2,P3)
+    [[4, 6, 9], 1, GLFF, []],             # 11: P4' = 3DGLFF(P3,P4,P5)
+
+    # === I-Level Upsample path (Px) ===
+    [9, 1, identity, []],                   # 12: Px5 = P5
+    [12, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[6, -1], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [512,2,7,9,11]],                # 15: Px4
+
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[4, -1], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [256,2,5,7,9]],                # 18: Px3
+
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[2, -1], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [128,2,3,5,7]],                # 21: Px2
+
+    # === II-Level Downsample with ABTM (Py) ===
+    [18, 1, identity, []],                  # 22: Py3 = Px3
+    [22, 1, ABTM, []],                      # ↓
+    [[-1, 15], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [512,2,7,9,11]],                # 25: Py4
+
+    [25, 1, ABTM, []],
+    [[-1, 12], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [1024,2,9,11,13]],               # 28: Py5
+
+    # === III-Level Fusion ===
+    [28, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[-1, 25, 11], 1, Add, []],
+    [-1, 1, LWC_C2f, [512,2,7,9,11]],                # 31: Pout4
+
+    [31, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[-1, 22], 1, Concat, [1]],
+    [-1, 1, LWC_C2f, [256,2,5,7,9]],                # 34: Pout3
+
+    [34, 1, nn.Upsample, [None, 2, "nearest"]],
+    [[-1, 21, 10], 1, Add, []],
+    [-1, 1, LWC_C2f, [128,2,3,5,7]],                # 37: Pout2
+  ]
+
+head:
+  [
+    [[37, 34, 31, 28], 1, Detect, [nc]]  # 输出4层: Pout2, Pout3, Pout4, Pout5
+  ]

@@ -1,0 +1,13 @@
+
+train: /dataspace/grj/anti-uav-rgb/images/train # train images (relative to 'path')  6471 images
+val: /dataspace/grj/anti-uav-rgb/images/val # val images (relative to 'path')  548 images
+test: /dataspace/grj/anti-uav-rgb/images/val # test images (optional)  1610 images
+
+# Classes
+names:
+  0: uav
+
+ 
+
+
+

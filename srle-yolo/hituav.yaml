@@ -1,0 +1,17 @@
+path: /dataspace/grj/VOCdevkit # dataset root dir
+train: hituav-train/images # train images (relative to 'path')  6471 images
+val: hituav-test/images # val images (relative to 'path')  548 images
+test: hituav-test/images # test images (optional)  1610 images
+
+# Classes
+names:
+  0: Person
+  1: Car
+  2: Bicycle
+  3: OtherVehicle
+  4: DontCare
+
+ 
+
+
+
